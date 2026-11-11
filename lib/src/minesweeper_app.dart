@@ -178,7 +178,7 @@ class _GameViewState extends State<_GameView> {
                   fontWeight: FontWeight.w900,
                   color: Color(0xfff6e7b4))),
           const Spacer(),
-          Text('${widget.game.remainingMines}',
+          Text(_statusLabel(widget.game.status),
               style: const TextStyle(
                   color: Color(0xfff6e7b4),
                   fontSize: 22,
@@ -228,9 +228,17 @@ class _GameViewState extends State<_GameView> {
                 style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xffe6be5b),
                     foregroundColor: const Color(0xff294a40)),
-                child: const Text('重新開始',
+                child: Text(widget.game.status == GameStatus.playing
+                    ? '重新開始'
+                    : '再玩一次',
                     style: TextStyle(fontWeight: FontWeight.w900)))),
       ]));
+  String _statusLabel(GameStatus status) => switch (status) {
+    GameStatus.ready => '準備',
+    GameStatus.playing => '${widget.game.remainingMines}',
+    GameStatus.won => '完成',
+    GameStatus.lost => '失敗',
+  };
   int _cellAt(Offset local) {
     final x = (local.dx + widget.game.viewportX) ~/ cellSize;
     final y = (local.dy + widget.game.viewportY) ~/ cellSize;
@@ -248,7 +256,7 @@ class _InfoBar extends StatelessWidget {
           color: const Color(0xfff6e7b4),
           borderRadius: BorderRadius.circular(16)),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        Text('雷 ${game.remainingMines}',
+        Text(_statusText,
             style: const TextStyle(
                 color: Color(0xff294a40), fontWeight: FontWeight.bold)),
         Text(
@@ -256,6 +264,13 @@ class _InfoBar extends StatelessWidget {
             style: const TextStyle(
                 color: Color(0xff294a40), fontWeight: FontWeight.bold))
       ]));
+
+  String get _statusText => switch (game.status) {
+    GameStatus.ready => '準備中',
+    GameStatus.playing => '雷 ${game.remainingMines}',
+    GameStatus.won => '挑戰成功',
+    GameStatus.lost => '踩到地雷',
+  };
 }
 
 class _Board extends StatelessWidget {
