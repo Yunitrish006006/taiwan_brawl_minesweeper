@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'minesweeper_game.dart';
 
@@ -188,33 +189,45 @@ class _GameViewState extends State<_GameView> {
         _InfoBar(game: widget.game),
         const SizedBox(height: 16),
         GestureDetector(
-            onLongPressStart: (details) {
-              _lastDrag = details.localPosition;
-              _pressedIndex = _cellAt(details.localPosition);
-              setState(() => _moved = false);
-            },
-            onLongPressMoveUpdate: (details) {
-              final delta = details.localPosition - _lastDrag;
-              _lastDrag = details.localPosition;
-              if (delta.distance > 0) _moved = true;
-              setState(() => widget.game.panBy(delta.dx, delta.dy,
-                  viewportSize: viewport, cellSize: cellSize));
-            },
-            onLongPressEnd: (_) {
-              if (!_moved)
-                setState(() => widget.game.toggleFlag(_pressedIndex));
-            },
-            onTapUp: (details) {
-              setState(
-                  () => widget.game.reveal(_cellAt(details.localPosition)));
-            },
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                    width: viewport,
-                    height: viewport,
-                    color: const Color(0xff294a40),
-                    child: _Board(game: widget.game)))),
+          onTapUp: (details) {
+            setState(() => widget.game.reveal(_cellAt(details.localPosition)));
+          },
+          child: RawGestureDetector(
+              gestures: {
+                LongPressGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<
+                        LongPressGestureRecognizer>(
+                  () => LongPressGestureRecognizer(
+                      duration: const Duration(milliseconds: 250)),
+                  (recognizer) {
+                    recognizer.onLongPressStart = (details) {
+                      _lastDrag = details.localPosition;
+                      _pressedIndex = _cellAt(details.localPosition);
+                      setState(() => _moved = false);
+                    };
+                    recognizer.onLongPressMoveUpdate = (details) {
+                      final delta = details.localPosition - _lastDrag;
+                      _lastDrag = details.localPosition;
+                      if (delta.distance > 0) _moved = true;
+                      setState(() => widget.game.panBy(delta.dx, delta.dy,
+                          viewportSize: viewport, cellSize: cellSize));
+                    };
+                    recognizer.onLongPressEnd = (_) {
+                      if (!_moved) {
+                        setState(() => widget.game.toggleFlag(_pressedIndex));
+                      }
+                    };
+                  },
+                ),
+              },
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                      width: viewport,
+                      height: viewport,
+                      color: const Color(0xff294a40),
+                      child: _Board(game: widget.game)))),
+        ),
         const SizedBox(height: 18),
         const Text('長按後滑動移動視角 · 點擊翻開 · 長按不移動插旗',
             textAlign: TextAlign.center,
@@ -228,17 +241,16 @@ class _GameViewState extends State<_GameView> {
                 style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xffe6be5b),
                     foregroundColor: const Color(0xff294a40)),
-                child: Text(widget.game.status == GameStatus.playing
-                    ? '重新開始'
-                    : '再玩一次',
+                child: Text(
+                    widget.game.status == GameStatus.playing ? '重新開始' : '再玩一次',
                     style: TextStyle(fontWeight: FontWeight.w900)))),
       ]));
   String _statusLabel(GameStatus status) => switch (status) {
-    GameStatus.ready => '準備',
-    GameStatus.playing => '${widget.game.remainingMines}',
-    GameStatus.won => '完成',
-    GameStatus.lost => '失敗',
-  };
+        GameStatus.ready => '準備',
+        GameStatus.playing => '${widget.game.remainingMines}',
+        GameStatus.won => '完成',
+        GameStatus.lost => '失敗',
+      };
   int _cellAt(Offset local) {
     final x = (local.dx + widget.game.viewportX) ~/ cellSize;
     final y = (local.dy + widget.game.viewportY) ~/ cellSize;
@@ -266,11 +278,11 @@ class _InfoBar extends StatelessWidget {
       ]));
 
   String get _statusText => switch (game.status) {
-    GameStatus.ready => '準備中',
-    GameStatus.playing => '雷 ${game.remainingMines}',
-    GameStatus.won => '挑戰成功',
-    GameStatus.lost => '踩到地雷',
-  };
+        GameStatus.ready => '準備中',
+        GameStatus.playing => '雷 ${game.remainingMines}',
+        GameStatus.won => '挑戰成功',
+        GameStatus.lost => '踩到地雷',
+      };
 }
 
 class _Board extends StatelessWidget {

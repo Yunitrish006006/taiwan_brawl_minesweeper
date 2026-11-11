@@ -23,8 +23,12 @@ void main() {
     expect(game.viewportY, 80);
 
     game.panBy(-9999, -9999, viewportSize: 216, cellSize: 24);
-    expect(game.viewportX, 384);
-    expect(game.viewportY, 384);
+    expect(game.viewportX, 408);
+    expect(game.viewportY, 408);
+
+    game.panBy(9999, 9999, viewportSize: 216, cellSize: 24);
+    expect(game.viewportX, -24);
+    expect(game.viewportY, -24);
   });
 
   test('long press without movement can toggle a flag', () {
