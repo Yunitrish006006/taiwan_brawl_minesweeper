@@ -81,4 +81,40 @@ void main() {
         everyElement(predicate<MinesweeperCell>(
             (cell) => cell.state == CellState.revealed)));
   });
+
+  test('flag subtraction is optional and never makes a number negative', () {
+    final game = MinesweeperGame(
+        selectedSize: BoardSize.nine, autoSubtractFlagged: true, seed: 19)
+      ..start();
+    game.reveal(40);
+    final numbered = game.cells.indexWhere((cell) =>
+        cell.state == CellState.revealed &&
+        !cell.isMine &&
+        cell.adjacentMines > 0);
+    expect(numbered, isNonNegative);
+    final before = game.displayedAdjacentMines(numbered);
+    final neighbor =
+        game.cells.indexWhere((cell) => cell.state == CellState.covered);
+    game.toggleFlag(neighbor);
+    expect(game.displayedAdjacentMines(numbered), lessThanOrEqualTo(before));
+    expect(game.displayedAdjacentMines(numbered), greaterThanOrEqualTo(0));
+  });
+
+  test('an incorrect flag immediately loses when the rule is enabled', () {
+    final game = MinesweeperGame(
+        selectedSize: BoardSize.nine, autoSubtractFlagged: true, seed: 19)
+      ..start();
+    game.reveal(40);
+    final wrongFlag = game.cells
+        .indexWhere((cell) => !cell.isMine && cell.state == CellState.covered);
+
+    game.toggleFlag(wrongFlag);
+
+    expect(game.status, GameStatus.lost);
+    expect(game.cells[wrongFlag].state, CellState.revealed);
+    expect(
+        game.cells.where((cell) => cell.isMine),
+        everyElement(predicate<MinesweeperCell>(
+            (cell) => cell.state == CellState.revealed)));
+  });
 }

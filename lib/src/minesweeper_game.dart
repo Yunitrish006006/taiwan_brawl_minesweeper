@@ -25,13 +25,17 @@ class MinesweeperCell {
 }
 
 class MinesweeperGame {
-  MinesweeperGame({required this.selectedSize, int? seed})
-      : _random = Random(seed),
+  MinesweeperGame({
+    required this.selectedSize,
+    this.autoSubtractFlagged = false,
+    int? seed,
+  })  : _random = Random(seed),
         cells = List.generate(
             selectedSize.cellsPerSide * selectedSize.cellsPerSide,
             (_) => MinesweeperCell());
 
   final BoardSize selectedSize;
+  final bool autoSubtractFlagged;
   final List<MinesweeperCell> cells;
   final Random _random;
   GameStatus status = GameStatus.ready;
@@ -44,6 +48,18 @@ class MinesweeperGame {
   int get flaggedCount =>
       cells.where((cell) => cell.state == CellState.flagged).length;
   int get remainingMines => selectedSize.mineCount - flaggedCount;
+
+  int displayedAdjacentMines(int index) {
+    if (!_validIndex(index)) return 0;
+    final cell = cells[index];
+    if (!autoSubtractFlagged) return cell.adjacentMines;
+    return max(
+        0,
+        cell.adjacentMines -
+            _neighbors(index)
+                .where((item) => cells[item].state == CellState.flagged)
+                .length);
+  }
 
   void start() {
     if (status != GameStatus.ready) return;
@@ -76,6 +92,13 @@ class MinesweeperGame {
     final cell = cells[index];
     if (cell.state == CellState.covered) {
       cell.state = CellState.flagged;
+      if (autoSubtractFlagged && !cell.isMine) {
+        cell.state = CellState.revealed;
+        for (final mine in cells.where((item) => item.isMine)) {
+          mine.state = CellState.revealed;
+        }
+        status = GameStatus.lost;
+      }
     } else if (cell.state == CellState.flagged) {
       cell.state = CellState.covered;
     }

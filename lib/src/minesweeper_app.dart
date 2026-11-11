@@ -19,6 +19,7 @@ class MinesweeperHome extends StatefulWidget {
 
 class _MinesweeperHomeState extends State<MinesweeperHome> {
   BoardSize _selected = BoardSize.nine;
+  bool _autoSubtractFlagged = false;
   MinesweeperGame? _game;
 
   @override
@@ -31,8 +32,13 @@ class _MinesweeperHomeState extends State<MinesweeperHome> {
               ? _StartView(
                   selected: _selected,
                   onSelected: (value) => setState(() => _selected = value),
+                  autoSubtractFlagged: _autoSubtractFlagged,
+                  onAutoSubtractChanged: (value) =>
+                      setState(() => _autoSubtractFlagged = value),
                   onStart: () => setState(() {
-                        _game = MinesweeperGame(selectedSize: _selected)
+                        _game = MinesweeperGame(
+                            selectedSize: _selected,
+                            autoSubtractFlagged: _autoSubtractFlagged)
                           ..start();
                       }))
               : _GameView(
@@ -49,9 +55,13 @@ class _StartView extends StatelessWidget {
   const _StartView(
       {required this.selected,
       required this.onSelected,
+      required this.autoSubtractFlagged,
+      required this.onAutoSubtractChanged,
       required this.onStart});
   final BoardSize selected;
   final ValueChanged<BoardSize> onSelected;
+  final bool autoSubtractFlagged;
+  final ValueChanged<bool> onAutoSubtractChanged;
   final VoidCallback onStart;
   @override
   Widget build(BuildContext context) => Padding(
@@ -78,6 +88,24 @@ class _StartView extends StatelessWidget {
                   size: size,
                   selected: size == selected,
                   onTap: () => onSelected(size))),
+        Container(
+            margin: const EdgeInsets.only(top: 2, bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+                color: const Color(0xff294a40),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xff688873))),
+            child: Row(children: [
+              const Expanded(
+                  child: Text('插旗自動扣除數字',
+                      style: TextStyle(
+                          color: Color(0xfff6e7b4),
+                          fontWeight: FontWeight.bold))),
+              Switch(
+                  value: autoSubtractFlagged,
+                  onChanged: onAutoSubtractChanged,
+                  activeThumbColor: const Color(0xffe6be5b))
+            ])),
         const SizedBox(height: 8),
         SizedBox(
             width: double.infinity,
@@ -309,12 +337,17 @@ class _Board extends StatelessWidget {
                           top: (index ~/ game.sideLength) * cellSize,
                           width: cellSize,
                           height: cellSize,
-                          child: _Cell(cell: game.cells[index]))
+                          child: _Cell(
+                              game: game,
+                              index: index,
+                              cell: game.cells[index]))
                   ])))));
 }
 
 class _Cell extends StatelessWidget {
-  const _Cell({required this.cell});
+  const _Cell({required this.game, required this.index, required this.cell});
+  final MinesweeperGame game;
+  final int index;
   final MinesweeperCell cell;
   @override
   Widget build(BuildContext context) {
@@ -326,8 +359,8 @@ class _Cell extends StatelessWidget {
         alignment: Alignment.center,
         child: cell.state == CellState.flagged
             ? const Text('⚑', style: TextStyle(fontSize: 15))
-            : revealed && !cell.isMine && cell.adjacentMines > 0
-                ? Text('${cell.adjacentMines}',
+            : revealed && !cell.isMine && game.displayedAdjacentMines(index) > 0
+                ? Text('${game.displayedAdjacentMines(index)}',
                     style: const TextStyle(
                         color: Color(0xff3b72a1),
                         fontSize: 14,
