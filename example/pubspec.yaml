@@ -1,0 +1,13 @@
+name: minesweeper_example
+publish_to: none
+environment:
+  sdk: ^3.4.0
+  flutter: '>=3.22.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  taiwan_brawl_minesweeper:
+    path: ..
+
+flutter:
+  uses-material-design: true

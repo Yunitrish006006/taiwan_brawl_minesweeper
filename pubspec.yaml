@@ -1,9 +1,14 @@
 name: taiwan_brawl_minesweeper
-description: Core rules and interaction model for Taiwan Brawl Minesweeper.
+description: Taiwan Brawl Minesweeper game and Flutter mobile UI.
 version: 0.1.0
 publish_to: none
 environment:
   sdk: ^3.4.0
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
 
 dev_dependencies:
   test: ^1.25.0
