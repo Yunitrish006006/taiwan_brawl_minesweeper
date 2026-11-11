@@ -144,11 +144,6 @@ class _GameView extends StatefulWidget {
 }
 
 class _GameViewState extends State<_GameView> {
-  // Matches the content width after the 24px horizontal page padding on Pixel 7a.
-  static const viewport = 382.0;
-  // The mobile viewport always shows exactly 9x9 cells. Larger boards keep
-  // this same cell size and are explored by long-press dragging.
-  static const cellSize = viewport / 9;
   static const dragSlop = 12.0;
   Timer? _timer;
   bool _moved = false;
@@ -188,36 +183,45 @@ class _GameViewState extends State<_GameView> {
         const SizedBox(height: 16),
         _InfoBar(game: widget.game),
         const SizedBox(height: 16),
-        GestureDetector(
-          key: const ValueKey('minesweeper-board'),
-          onTapUp: (details) {
-            setState(() => widget.game.reveal(_cellAt(details.localPosition)));
-          },
-          onDoubleTapDown: (details) {
-            _doubleTapIndex = _cellAt(details.localPosition);
-          },
-          onDoubleTap: () {
-            setState(() => widget.game.toggleFlag(_doubleTapIndex));
-          },
-          onPanStart: (details) {
-            _moved = false;
-          },
-          onPanUpdate: (details) {
-            if (details.delta.distance > dragSlop) _moved = true;
-            if (_moved) {
-              setState(() => widget.game.panBy(
-                  details.delta.dx, details.delta.dy,
-                  viewportSize: viewport, cellSize: cellSize));
-            }
-          },
-          child: ClipRRect(
+        LayoutBuilder(builder: (context, constraints) {
+          final viewport = constraints.maxWidth;
+          final cellSize = viewport / 9;
+          return GestureDetector(
+            key: const ValueKey('minesweeper-board'),
+            onTapUp: (details) {
+              setState(() =>
+                  widget.game.reveal(_cellAt(details.localPosition, cellSize)));
+            },
+            onDoubleTapDown: (details) {
+              _doubleTapIndex = _cellAt(details.localPosition, cellSize);
+            },
+            onDoubleTap: () {
+              setState(() => widget.game.toggleFlag(_doubleTapIndex));
+            },
+            onPanStart: (_) {
+              _moved = false;
+            },
+            onPanUpdate: (details) {
+              if (details.delta.distance > dragSlop) _moved = true;
+              if (_moved) {
+                setState(() => widget.game.panBy(
+                    details.delta.dx, details.delta.dy,
+                    viewportSize: viewport, cellSize: cellSize));
+              }
+            },
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
-              child: Container(
-                  width: viewport,
-                  height: viewport,
+              child: SizedBox(
+                width: viewport,
+                height: viewport,
+                child: ColoredBox(
                   color: const Color(0xff294a40),
-                  child: _Board(game: widget.game))),
-        ),
+                  child: _Board(game: widget.game, cellSize: cellSize),
+                ),
+              ),
+            ),
+          );
+        }),
         const SizedBox(height: 18),
         const Text('拖曳移動視角 · 點擊翻開 · 雙擊插旗',
             textAlign: TextAlign.center,
@@ -241,7 +245,7 @@ class _GameViewState extends State<_GameView> {
         GameStatus.won => '完成',
         GameStatus.lost => '失敗',
       };
-  int _cellAt(Offset local) {
+  int _cellAt(Offset local, double cellSize) {
     final x = (local.dx + widget.game.viewportX) ~/ cellSize;
     final y = (local.dy + widget.game.viewportY) ~/ cellSize;
     return y * widget.game.sideLength + x;
@@ -276,8 +280,9 @@ class _InfoBar extends StatelessWidget {
 }
 
 class _Board extends StatelessWidget {
-  const _Board({required this.game});
+  const _Board({required this.game, required this.cellSize});
   final MinesweeperGame game;
+  final double cellSize;
   @override
   Widget build(BuildContext context) => ClipRect(
       child: OverflowBox(
@@ -289,17 +294,15 @@ class _Board extends StatelessWidget {
           child: Transform.translate(
               offset: Offset(-game.viewportX, -game.viewportY),
               child: SizedBox(
-                  width: game.sideLength * _GameViewState.cellSize,
-                  height: game.sideLength * _GameViewState.cellSize,
+                  width: game.sideLength * cellSize,
+                  height: game.sideLength * cellSize,
                   child: Stack(children: [
                     for (var index = 0; index < game.cells.length; index++)
                       Positioned(
-                          left: (index % game.sideLength) *
-                              _GameViewState.cellSize,
-                          top: (index ~/ game.sideLength) *
-                              _GameViewState.cellSize,
-                          width: _GameViewState.cellSize,
-                          height: _GameViewState.cellSize,
+                          left: (index % game.sideLength) * cellSize,
+                          top: (index ~/ game.sideLength) * cellSize,
+                          width: cellSize,
+                          height: cellSize,
                           child: _Cell(cell: game.cells[index]))
                   ])))));
 }
