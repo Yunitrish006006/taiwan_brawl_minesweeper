@@ -83,7 +83,7 @@ class MinesweeperGame {
 
   void panBy(double dx, double dy,
       {required double viewportSize, required double cellSize}) {
-    if (status != GameStatus.playing) return;
+    if (status == GameStatus.ready) return;
     final maxOffset = max(0, sideLength * cellSize - viewportSize).toDouble();
     viewportX = (viewportX - dx).clamp(0, maxOffset).toDouble();
     viewportY = (viewportY - dy).clamp(0, maxOffset).toDouble();

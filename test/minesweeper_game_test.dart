@@ -35,4 +35,21 @@ void main() {
     game.toggleFlag(4);
     expect(game.cells[4].state, CellState.covered);
   });
+
+  test('a lost large board can still pan to inspect every revealed mine', () {
+    final game = MinesweeperGame(selectedSize: BoardSize.sixteen, seed: 7)
+      ..start();
+    game.reveal(0);
+    final mineIndex = game.cells.indexWhere((cell) => cell.isMine);
+    game.reveal(mineIndex);
+
+    expect(game.status, GameStatus.lost);
+    game.panBy(-100, -100, viewportSize: 216, cellSize: 24);
+    expect(game.viewportX, 100);
+    expect(game.viewportY, 100);
+    expect(
+        game.cells.where((cell) => cell.isMine),
+        everyElement(predicate<MinesweeperCell>(
+            (cell) => cell.state == CellState.revealed)));
+  });
 }
