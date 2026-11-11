@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'minesweeper_game.dart';
 
@@ -93,7 +92,7 @@ class _StartView extends StatelessWidget {
                         TextStyle(fontWeight: FontWeight.w900, fontSize: 16)))),
         const Spacer(),
         const Center(
-            child: Text('大棋盤會維持固定格子大小，長按後可滑動視角',
+            child: Text('大棋盤會維持固定格子大小，拖曳即可滑動視角',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Color(0xff789184), fontSize: 12))),
       ]));
@@ -152,9 +151,7 @@ class _GameViewState extends State<_GameView> {
   static const dragSlop = 12.0;
   Timer? _timer;
   bool _moved = false;
-  double _dragDistance = 0;
-  Offset _lastDrag = Offset.zero;
-  int _pressedIndex = 0;
+  int _doubleTapIndex = 0;
   @override
   void initState() {
     super.initState();
@@ -195,48 +192,33 @@ class _GameViewState extends State<_GameView> {
           onTapUp: (details) {
             setState(() => widget.game.reveal(_cellAt(details.localPosition)));
           },
-          child: RawGestureDetector(
-              gestures: {
-                LongPressGestureRecognizer:
-                    GestureRecognizerFactoryWithHandlers<
-                        LongPressGestureRecognizer>(
-                  () => LongPressGestureRecognizer(
-                      duration: const Duration(milliseconds: 250)),
-                  (recognizer) {
-                    recognizer.onLongPressStart = (details) {
-                      _lastDrag = details.localPosition;
-                      _pressedIndex = _cellAt(details.localPosition);
-                      _dragDistance = 0;
-                      setState(() => _moved = false);
-                    };
-                    recognizer.onLongPressMoveUpdate = (details) {
-                      final delta = details.localPosition - _lastDrag;
-                      _lastDrag = details.localPosition;
-                      _dragDistance += delta.distance;
-                      if (_dragDistance > dragSlop) _moved = true;
-                      if (_moved) {
-                        setState(() => widget.game.panBy(delta.dx, delta.dy,
-                            viewportSize: viewport, cellSize: cellSize));
-                      }
-                    };
-                    recognizer.onLongPressEnd = (_) {
-                      if (!_moved) {
-                        setState(() => widget.game.toggleFlag(_pressedIndex));
-                      }
-                    };
-                  },
-                ),
-              },
-              child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Container(
-                      width: viewport,
-                      height: viewport,
-                      color: const Color(0xff294a40),
-                      child: _Board(game: widget.game)))),
+          onDoubleTapDown: (details) {
+            _doubleTapIndex = _cellAt(details.localPosition);
+          },
+          onDoubleTap: () {
+            setState(() => widget.game.toggleFlag(_doubleTapIndex));
+          },
+          onPanStart: (details) {
+            _moved = false;
+          },
+          onPanUpdate: (details) {
+            if (details.delta.distance > dragSlop) _moved = true;
+            if (_moved) {
+              setState(() => widget.game.panBy(
+                  details.delta.dx, details.delta.dy,
+                  viewportSize: viewport, cellSize: cellSize));
+            }
+          },
+          child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                  width: viewport,
+                  height: viewport,
+                  color: const Color(0xff294a40),
+                  child: _Board(game: widget.game))),
         ),
         const SizedBox(height: 18),
-        const Text('長按後滑動移動視角 · 點擊翻開 · 長按不移動插旗',
+        const Text('拖曳移動視角 · 點擊翻開 · 雙擊插旗',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xff9db5a2), fontSize: 12)),
         const SizedBox(height: 18),
