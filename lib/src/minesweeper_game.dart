@@ -100,7 +100,8 @@ class MinesweeperGame {
 
   void _placeMines(int safeIndex) {
     final candidates = List<int>.generate(cells.length, (index) => index)
-      ..remove(safeIndex)
+      ..removeWhere((index) =>
+          index == safeIndex || _neighbors(safeIndex).contains(index))
       ..shuffle(_random);
     for (final index in candidates.take(selectedSize.mineCount))
       cells[index].isMine = true;

@@ -15,6 +15,22 @@ void main() {
     expect(game.selectedSize, BoardSize.twentyFive);
   });
 
+  test('the first reveal has zero mines in its surrounding eight cells', () {
+    final game = MinesweeperGame(selectedSize: BoardSize.nine, seed: 19)
+      ..start();
+    const firstIndex = 40;
+
+    game.reveal(firstIndex);
+
+    expect(game.cells[firstIndex].isMine, isFalse);
+    expect(game.cells[firstIndex].adjacentMines, 0);
+    for (final cell in game.cells) {
+      if (cell.state == CellState.revealed) {
+        expect(cell.isMine, isFalse);
+      }
+    }
+  });
+
   test('large boards pan inside a fixed-size viewport', () {
     final game = MinesweeperGame(selectedSize: BoardSize.twentyFive)..start();
 
