@@ -148,6 +148,7 @@ class _GameViewState extends State<_GameView> {
   Timer? _timer;
   bool _moved = false;
   int _doubleTapIndex = 0;
+  bool _initialViewportCentered = false;
   @override
   void initState() {
     super.initState();
@@ -186,6 +187,11 @@ class _GameViewState extends State<_GameView> {
         LayoutBuilder(builder: (context, constraints) {
           final viewport = constraints.maxWidth;
           final cellSize = viewport / 9;
+          if (!_initialViewportCentered) {
+            widget.game
+                .centerViewport(viewportSize: viewport, cellSize: cellSize);
+            _initialViewportCentered = true;
+          }
           return GestureDetector(
             key: const ValueKey('minesweeper-board'),
             onTapUp: (details) {

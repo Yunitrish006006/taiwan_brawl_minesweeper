@@ -95,6 +95,13 @@ class MinesweeperGame {
         .toDouble();
   }
 
+  void centerViewport(
+      {required double viewportSize, required double cellSize}) {
+    final boardExtent = sideLength * cellSize;
+    viewportX = max(0, (boardExtent - viewportSize) / 2).toDouble();
+    viewportY = max(0, (boardExtent - viewportSize) / 2).toDouble();
+  }
+
   bool get _hasMines => cells.any((cell) => cell.isMine);
   bool _validIndex(int index) => index >= 0 && index < cells.length;
 

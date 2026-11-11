@@ -47,6 +47,15 @@ void main() {
     expect(game.viewportY, -24);
   });
 
+  test('large boards begin with a centered viewport', () {
+    final game = MinesweeperGame(selectedSize: BoardSize.sixteen)..start();
+
+    game.centerViewport(viewportSize: 216, cellSize: 24);
+
+    expect(game.viewportX, 84);
+    expect(game.viewportY, 84);
+  });
+
   test('long press without movement can toggle a flag', () {
     final game = MinesweeperGame(selectedSize: BoardSize.nine)..start();
 
