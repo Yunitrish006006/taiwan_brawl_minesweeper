@@ -19,7 +19,6 @@ class MinesweeperHome extends StatefulWidget {
 
 class _MinesweeperHomeState extends State<MinesweeperHome> {
   BoardSize _selected = BoardSize.nine;
-  bool _autoSubtractFlagged = false;
   MinesweeperGame? _game;
 
   @override
@@ -32,13 +31,8 @@ class _MinesweeperHomeState extends State<MinesweeperHome> {
               ? _StartView(
                   selected: _selected,
                   onSelected: (value) => setState(() => _selected = value),
-                  autoSubtractFlagged: _autoSubtractFlagged,
-                  onAutoSubtractChanged: (value) =>
-                      setState(() => _autoSubtractFlagged = value),
                   onStart: () => setState(() {
-                        _game = MinesweeperGame(
-                            selectedSize: _selected,
-                            autoSubtractFlagged: _autoSubtractFlagged)
+                        _game = MinesweeperGame(selectedSize: _selected)
                           ..start();
                       }))
               : _GameView(
@@ -55,13 +49,9 @@ class _StartView extends StatelessWidget {
   const _StartView(
       {required this.selected,
       required this.onSelected,
-      required this.autoSubtractFlagged,
-      required this.onAutoSubtractChanged,
       required this.onStart});
   final BoardSize selected;
   final ValueChanged<BoardSize> onSelected;
-  final bool autoSubtractFlagged;
-  final ValueChanged<bool> onAutoSubtractChanged;
   final VoidCallback onStart;
   @override
   Widget build(BuildContext context) => Padding(
@@ -88,24 +78,6 @@ class _StartView extends StatelessWidget {
                   size: size,
                   selected: size == selected,
                   onTap: () => onSelected(size))),
-        Container(
-            margin: const EdgeInsets.only(top: 2, bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-                color: const Color(0xff294a40),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xff688873))),
-            child: Row(children: [
-              const Expanded(
-                  child: Text('插旗自動扣除數字',
-                      style: TextStyle(
-                          color: Color(0xfff6e7b4),
-                          fontWeight: FontWeight.bold))),
-              Switch(
-                  value: autoSubtractFlagged,
-                  onChanged: onAutoSubtractChanged,
-                  activeThumbColor: const Color(0xffe6be5b))
-            ])),
         const SizedBox(height: 8),
         SizedBox(
             width: double.infinity,
@@ -212,6 +184,11 @@ class _GameViewState extends State<_GameView> {
         const SizedBox(height: 16),
         _InfoBar(game: widget.game),
         const SizedBox(height: 16),
+        _FlagSubtractionSwitch(
+            game: widget.game,
+            onChanged: (value) =>
+                setState(() => widget.game.autoSubtractFlagged = value)),
+        const SizedBox(height: 16),
         LayoutBuilder(builder: (context, constraints) {
           final viewport = constraints.maxWidth;
           final cellSize = viewport / 9;
@@ -283,6 +260,33 @@ class _GameViewState extends State<_GameView> {
     final x = (local.dx + widget.game.viewportX) ~/ cellSize;
     final y = (local.dy + widget.game.viewportY) ~/ cellSize;
     return y * widget.game.sideLength + x;
+  }
+}
+
+class _FlagSubtractionSwitch extends StatelessWidget {
+  const _FlagSubtractionSwitch({required this.game, required this.onChanged});
+  final MinesweeperGame game;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+            color: const Color(0xff294a40),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xff688873))),
+        child: Row(children: [
+          const Expanded(
+              child: Text('插旗自動扣除數字',
+                  style: TextStyle(
+                      color: Color(0xfff6e7b4), fontWeight: FontWeight.bold))),
+          Switch(
+              value: game.autoSubtractFlagged,
+              onChanged: onChanged,
+              activeThumbColor: const Color(0xffe6be5b))
+        ]));
   }
 }
 

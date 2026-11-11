@@ -35,7 +35,7 @@ class MinesweeperGame {
             (_) => MinesweeperCell());
 
   final BoardSize selectedSize;
-  final bool autoSubtractFlagged;
+  bool autoSubtractFlagged;
   final List<MinesweeperCell> cells;
   final Random _random;
   GameStatus status = GameStatus.ready;
