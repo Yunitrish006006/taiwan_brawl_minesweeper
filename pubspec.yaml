@@ -1,0 +1,9 @@
+name: taiwan_brawl_minesweeper
+description: Core rules and interaction model for Taiwan Brawl Minesweeper.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.4.0
+
+dev_dependencies:
+  test: ^1.25.0
