@@ -297,20 +297,28 @@ class _Board extends StatelessWidget {
   final MinesweeperGame game;
   @override
   Widget build(BuildContext context) => ClipRect(
-      child: Transform.translate(
-          offset: Offset(-game.viewportX, -game.viewportY),
-          child: SizedBox(
-              width: game.sideLength * _GameViewState.cellSize,
-              height: game.sideLength * _GameViewState.cellSize,
-              child: Stack(children: [
-                for (var index = 0; index < game.cells.length; index++)
-                  Positioned(
-                      left: (index % game.sideLength) * _GameViewState.cellSize,
-                      top: (index ~/ game.sideLength) * _GameViewState.cellSize,
-                      width: _GameViewState.cellSize,
-                      height: _GameViewState.cellSize,
-                      child: _Cell(cell: game.cells[index]))
-              ]))));
+      child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: 0,
+          maxWidth: double.infinity,
+          minHeight: 0,
+          maxHeight: double.infinity,
+          child: Transform.translate(
+              offset: Offset(-game.viewportX, -game.viewportY),
+              child: SizedBox(
+                  width: game.sideLength * _GameViewState.cellSize,
+                  height: game.sideLength * _GameViewState.cellSize,
+                  child: Stack(children: [
+                    for (var index = 0; index < game.cells.length; index++)
+                      Positioned(
+                          left: (index % game.sideLength) *
+                              _GameViewState.cellSize,
+                          top: (index ~/ game.sideLength) *
+                              _GameViewState.cellSize,
+                          width: _GameViewState.cellSize,
+                          height: _GameViewState.cellSize,
+                          child: _Cell(cell: game.cells[index]))
+                  ])))));
 }
 
 class _Cell extends StatelessWidget {
