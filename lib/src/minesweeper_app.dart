@@ -144,7 +144,8 @@ class _GameView extends StatefulWidget {
 }
 
 class _GameViewState extends State<_GameView> {
-  static const viewport = 380.0;
+  // Matches the content width after the 24px horizontal page padding on Pixel 7a.
+  static const viewport = 382.0;
   // The mobile viewport always shows exactly 9x9 cells. Larger boards keep
   // this same cell size and are explored by long-press dragging.
   static const cellSize = viewport / 9;
