@@ -149,8 +149,10 @@ class _GameViewState extends State<_GameView> {
   // The mobile viewport always shows exactly 9x9 cells. Larger boards keep
   // this same cell size and are explored by long-press dragging.
   static const cellSize = viewport / 9;
+  static const dragSlop = 12.0;
   Timer? _timer;
   bool _moved = false;
+  double _dragDistance = 0;
   Offset _lastDrag = Offset.zero;
   int _pressedIndex = 0;
   @override
@@ -189,6 +191,7 @@ class _GameViewState extends State<_GameView> {
         _InfoBar(game: widget.game),
         const SizedBox(height: 16),
         GestureDetector(
+          key: const ValueKey('minesweeper-board'),
           onTapUp: (details) {
             setState(() => widget.game.reveal(_cellAt(details.localPosition)));
           },
@@ -203,14 +206,18 @@ class _GameViewState extends State<_GameView> {
                     recognizer.onLongPressStart = (details) {
                       _lastDrag = details.localPosition;
                       _pressedIndex = _cellAt(details.localPosition);
+                      _dragDistance = 0;
                       setState(() => _moved = false);
                     };
                     recognizer.onLongPressMoveUpdate = (details) {
                       final delta = details.localPosition - _lastDrag;
                       _lastDrag = details.localPosition;
-                      if (delta.distance > 0) _moved = true;
-                      setState(() => widget.game.panBy(delta.dx, delta.dy,
-                          viewportSize: viewport, cellSize: cellSize));
+                      _dragDistance += delta.distance;
+                      if (_dragDistance > dragSlop) _moved = true;
+                      if (_moved) {
+                        setState(() => widget.game.panBy(delta.dx, delta.dy,
+                            viewportSize: viewport, cellSize: cellSize));
+                      }
                     };
                     recognizer.onLongPressEnd = (_) {
                       if (!_moved) {
