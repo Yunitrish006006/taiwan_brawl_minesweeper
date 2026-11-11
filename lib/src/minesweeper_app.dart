@@ -144,7 +144,10 @@ class _GameView extends StatefulWidget {
 }
 
 class _GameViewState extends State<_GameView> {
-  static const viewport = 352.0, cellSize = 24.0;
+  static const viewport = 352.0;
+  // The mobile viewport always shows exactly 9x9 cells. Larger boards keep
+  // this same cell size and are explored by long-press dragging.
+  static const cellSize = viewport / 9;
   Timer? _timer;
   bool _moved = false;
   Offset _lastDrag = Offset.zero;
