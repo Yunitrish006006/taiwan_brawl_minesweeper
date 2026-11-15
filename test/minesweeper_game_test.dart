@@ -82,6 +82,77 @@ void main() {
             (cell) => cell.state == CellState.revealed)));
   });
 
+  test('revealing every safe cell completes the game', () {
+    final game = MinesweeperGame(selectedSize: BoardSize.nine, seed: 19)
+      ..start();
+
+    game.reveal(40);
+    for (var index = 0; index < game.cells.length; index++) {
+      if (!game.cells[index].isMine) game.reveal(index);
+    }
+
+    expect(game.status, GameStatus.won);
+    expect(
+      game.cells.where((cell) => !cell.isMine),
+      everyElement(predicate<MinesweeperCell>(
+        (cell) => cell.state == CellState.revealed,
+      )),
+    );
+  });
+
+  test('miner mode pre-digs the center and supports flags', () {
+    final game = MinesweeperGame(
+      selectedSize: BoardSize.nine,
+      mode: MinesweeperMode.miner,
+      seed: 19,
+    )..start();
+
+    const center = 40;
+    expect(game.cells[center].state, CellState.revealed);
+    expect(game.cells[center].isMine, isFalse);
+
+    game.toggleFlag(0);
+    expect(game.cells[0].state, CellState.flagged);
+
+    final mineIndex = game.cells.indexWhere((cell) => cell.isMine);
+    game.reveal(mineIndex);
+    expect(game.status, GameStatus.lost);
+  });
+
+  test('miner movement only enters orthogonally revealed cells', () {
+    final game = MinesweeperGame(
+      selectedSize: BoardSize.nine,
+      mode: MinesweeperMode.miner,
+      seed: 19,
+    )..start();
+
+    expect(game.moveMiner(MinerDirection.up), isTrue);
+    expect(game.minerIndex, 31);
+    expect(game.moveMiner(MinerDirection.left), isTrue);
+    expect(game.minerIndex, 30);
+
+    while (game.moveMiner(MinerDirection.up)) {}
+    expect(game.cells[game.minerIndex!].state, CellState.revealed);
+  });
+
+  test('miner actions operate on the tile it is facing', () {
+    final game = MinesweeperGame(
+      selectedSize: BoardSize.nine,
+      mode: MinesweeperMode.miner,
+      seed: 19,
+    )..start();
+
+    game.moveMiner(MinerDirection.up);
+    expect(game.minerFacing, MinerDirection.up);
+    game.flagMinerFacing();
+    expect(game.cells[22].state, CellState.flagged);
+
+    game.moveMiner(MinerDirection.right);
+    expect(game.minerFacing, MinerDirection.right);
+    game.digMinerFacing();
+    expect(game.cells[33].state, isNot(CellState.covered));
+  });
+
   test('flag subtraction is optional and never makes a number negative', () {
     final game = MinesweeperGame(
         selectedSize: BoardSize.nine, autoSubtractFlagged: true, seed: 19)

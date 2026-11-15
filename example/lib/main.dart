@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:taiwan_brawl_minesweeper/taiwan_brawl_minesweeper_flutter.dart';
 
-void main() => runApp(const MinesweeperApp());
+void main() => runApp(const MaterialApp(home: MinesweeperApp()));

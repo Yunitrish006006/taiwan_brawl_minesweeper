@@ -14,6 +14,10 @@ enum CellState { covered, revealed, flagged }
 
 enum GameStatus { ready, playing, won, lost }
 
+enum MinesweeperMode { classic, miner }
+
+enum MinerDirection { up, down, left, right }
+
 class MinesweeperCell {
   MinesweeperCell(
       {this.state = CellState.covered,
@@ -27,6 +31,7 @@ class MinesweeperCell {
 class MinesweeperGame {
   MinesweeperGame({
     required this.selectedSize,
+    this.mode = MinesweeperMode.classic,
     this.autoSubtractFlagged = false,
     int? seed,
   })  : _random = Random(seed),
@@ -35,6 +40,7 @@ class MinesweeperGame {
             (_) => MinesweeperCell());
 
   final BoardSize selectedSize;
+  final MinesweeperMode mode;
   bool autoSubtractFlagged;
   final List<MinesweeperCell> cells;
   final Random _random;
@@ -43,6 +49,15 @@ class MinesweeperGame {
   double viewportY = 0;
   DateTime? startedAt;
   int elapsedSeconds = 0;
+  int? minerIndex;
+  MinerDirection minerFacing = MinerDirection.up;
+
+  String get minerFacingLabel => switch (minerFacing) {
+        MinerDirection.up => '上',
+        MinerDirection.down => '下',
+        MinerDirection.left => '左',
+        MinerDirection.right => '右',
+      };
 
   int get sideLength => selectedSize.cellsPerSide;
   int get flaggedCount =>
@@ -65,6 +80,12 @@ class MinesweeperGame {
     if (status != GameStatus.ready) return;
     status = GameStatus.playing;
     startedAt = DateTime.now();
+    if (mode == MinesweeperMode.miner) {
+      final center = (sideLength ~/ 2) * sideLength + sideLength ~/ 2;
+      _placeMines(center);
+      _floodReveal(center);
+      minerIndex = center;
+    }
   }
 
   void reveal(int index) {
@@ -102,6 +123,70 @@ class MinesweeperGame {
     } else if (cell.state == CellState.flagged) {
       cell.state = CellState.covered;
     }
+  }
+
+  bool moveMiner(MinerDirection direction) {
+    if (mode != MinesweeperMode.miner ||
+        status != GameStatus.playing ||
+        minerIndex == null) return false;
+    minerFacing = direction;
+    final row = minerIndex! ~/ sideLength;
+    final column = minerIndex! % sideLength;
+    final targetRow = row +
+        switch (direction) {
+          MinerDirection.up => -1,
+          MinerDirection.down => 1,
+          MinerDirection.left || MinerDirection.right => 0,
+        };
+    final targetColumn = column +
+        switch (direction) {
+          MinerDirection.left => -1,
+          MinerDirection.right => 1,
+          MinerDirection.up || MinerDirection.down => 0,
+        };
+    if (targetRow < 0 ||
+        targetRow >= sideLength ||
+        targetColumn < 0 ||
+        targetColumn >= sideLength) return false;
+    final target = targetRow * sideLength + targetColumn;
+    if (cells[target].state != CellState.revealed) return false;
+    minerIndex = target;
+    return true;
+  }
+
+  void digMinerFacing() {
+    final target = _minerTargetIndex();
+    if (target != null) reveal(target);
+  }
+
+  void flagMinerFacing() {
+    final target = _minerTargetIndex();
+    if (target != null) toggleFlag(target);
+  }
+
+  int? _minerTargetIndex() {
+    if (mode != MinesweeperMode.miner ||
+        status != GameStatus.playing ||
+        minerIndex == null) return null;
+    final row = minerIndex! ~/ sideLength;
+    final column = minerIndex! % sideLength;
+    final targetRow = row +
+        switch (minerFacing) {
+          MinerDirection.up => -1,
+          MinerDirection.down => 1,
+          MinerDirection.left || MinerDirection.right => 0,
+        };
+    final targetColumn = column +
+        switch (minerFacing) {
+          MinerDirection.left => -1,
+          MinerDirection.right => 1,
+          MinerDirection.up || MinerDirection.down => 0,
+        };
+    if (targetRow < 0 ||
+        targetRow >= sideLength ||
+        targetColumn < 0 ||
+        targetColumn >= sideLength) return null;
+    return targetRow * sideLength + targetColumn;
   }
 
   void panBy(double dx, double dy,
