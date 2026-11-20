@@ -90,4 +90,100 @@ void main() {
     expect(find.byKey(const ValueKey('miner-joystick-knob')), findsOneWidget);
     expect(find.text('拖曳方向'), findsOneWidget);
   });
+
+  testWidgets('miner stays centered while the board follows each step',
+      (tester) async {
+    await _startMinerOnPhone(tester);
+    final board = find.byKey(const ValueKey('minesweeper-board'));
+    final miner = find.byKey(const ValueKey('miner-player'));
+    final stick = tester.getCenter(
+      find.byKey(const ValueKey('miner-joystick-knob')),
+    );
+    final center = tester.getCenter(board);
+    final initialGridX = _gridX(tester, board);
+    expect(tester.getCenter(miner), center);
+
+    await tester.dragFrom(center, const Offset(-80, 0));
+    await tester.pumpAndSettle();
+    expect(_gridX(tester, board), initialGridX);
+
+    final gesture = await tester.startGesture(stick);
+    await gesture.moveBy(const Offset(38, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.getCenter(miner), center);
+    expect(tester.widget<Text>(miner).data, '→⛏️');
+    expect(
+      _gridX(tester, board),
+      closeTo(initialGridX - tester.getSize(board).width / 9, 0.01),
+    );
+    await gesture.up();
+  });
+
+  testWidgets(
+      'stick repeats while held, stabilizes diagonals and stops in neutral',
+      (tester) async {
+    await _startMinerOnPhone(tester);
+    final board = find.byKey(const ValueKey('minesweeper-board'));
+    final miner = find.byKey(const ValueKey('miner-player'));
+    final stick = tester.getCenter(
+      find.byKey(const ValueKey('miner-joystick-knob')),
+    );
+    final initialGridX = _gridX(tester, board);
+    final cellSize = tester.getSize(board).width / 9;
+
+    // The generated opening always reveals one tile on each side.
+    final left = await tester.startGesture(stick);
+    await left.moveBy(const Offset(-35, 0));
+    await left.up();
+    await tester.pumpAndSettle();
+    expect(_gridX(tester, board), closeTo(initialGridX + cellSize, 0.01));
+
+    final right = await tester.startGesture(stick);
+    await right.moveTo(stick + const Offset(45, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 95));
+    expect(_gridX(tester, board), closeTo(initialGridX, 0.01));
+    await right.moveTo(stick + const Offset(31, 33));
+    await tester.pump(const Duration(milliseconds: 20));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<Text>(miner).data, '→⛏️');
+    expect(_gridX(tester, board), closeTo(initialGridX - cellSize, 0.01));
+
+    await right.moveTo(stick);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(_gridX(tester, board), closeTo(initialGridX - cellSize, 0.01));
+    expect(tester.getCenter(find.byIcon(Icons.open_with)), stick);
+
+    await right.moveTo(stick + const Offset(-14, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<Text>(miner).data, '←⛏️');
+    expect(_gridX(tester, board), closeTo(initialGridX, 0.01));
+    await right.cancel();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(_gridX(tester, board), closeTo(initialGridX, 0.01));
+    expect(tester.getCenter(find.byIcon(Icons.open_with)), stick);
+  });
 }
+
+Future<void> _startMinerOnPhone(WidgetTester tester) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(390, 844);
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(const MaterialApp(home: MinesweeperApp()));
+  await tester.tap(find.text('礦工模式'));
+  await tester.tap(find.text('16 × 16'));
+  await tester.pump();
+  await tester.tap(find.text('開始遊戲'));
+  await tester.pumpAndSettle();
+}
+
+double _gridX(WidgetTester tester, Finder board) => tester
+    .widget<Transform>(
+      find.descendant(of: board, matching: find.byType(Transform)).first,
+    )
+    .transform
+    .getTranslation()
+    .x;

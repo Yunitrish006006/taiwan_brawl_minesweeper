@@ -1,7 +1,9 @@
 import 'dart:async';
-import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:user_ui_settings/user_ui_settings.dart';
+
 import 'minesweeper_game.dart';
 import 'minesweeper_localizations.dart';
 
@@ -229,6 +231,7 @@ class _GameViewState extends State<_GameView> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final minerMode = widget.game.mode == MinesweeperMode.miner;
     return SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
         child: Column(children: [
@@ -248,27 +251,72 @@ class _GameViewState extends State<_GameView> {
           const SizedBox(height: 16),
           _InfoBar(game: widget.game),
           const SizedBox(height: 16),
-          if (widget.game.mode == MinesweeperMode.classic)
+          if (!minerMode)
             _FlagSubtractionSwitch(
                 game: widget.game,
                 onChanged: (value) =>
                     setState(() => widget.game.autoSubtractFlagged = value)),
-          if (widget.game.mode == MinesweeperMode.miner) ...[
+          if (minerMode) ...[
             const SizedBox(height: 12),
           ],
           const SizedBox(height: 16),
           LayoutBuilder(builder: (context, constraints) {
             final viewport = constraints.maxWidth;
             final cellSize = viewport / 9;
-            if (!_initialViewportCentered) {
+            if (!minerMode && !_initialViewportCentered) {
               widget.game
                   .centerViewport(viewportSize: viewport, cellSize: cellSize);
               _initialViewportCentered = true;
             }
+            final minerIndex = widget.game.minerIndex;
+            final cameraOffset = minerIndex == null
+                ? Offset(widget.game.viewportX, widget.game.viewportY)
+                : Offset(
+                    (minerIndex % widget.game.sideLength + 0.5) * cellSize -
+                        viewport / 2,
+                    (minerIndex ~/ widget.game.sideLength + 0.5) * cellSize -
+                        viewport / 2,
+                  );
+            final animateCamera = minerMode &&
+                !(GameUiSettingsScope.maybeOf(context)?.disableAnimations ??
+                    false) &&
+                !MediaQuery.disableAnimationsOf(context);
+            final viewportWidget = ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: SizedBox.square(
+                dimension: viewport,
+                child: ColoredBox(
+                  color: scheme.surfaceContainerHighest,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _Board(
+                        key: ObjectKey(widget.game),
+                        game: widget.game,
+                        cellSize: cellSize,
+                        cameraOffset: cameraOffset,
+                        animateCamera: animateCamera,
+                      ),
+                      if (minerIndex != null)
+                        Center(
+                          child: Text(
+                            '${_minerArrow(widget.game.minerFacing)}⛏️',
+                            key: const ValueKey('miner-player'),
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+            const boardKey = ValueKey('minesweeper-board');
+            if (minerMode) {
+              return KeyedSubtree(key: boardKey, child: viewportWidget);
+            }
             return GestureDetector(
-              key: const ValueKey('minesweeper-board'),
+              key: boardKey,
               onTapUp: (details) {
-                if (widget.game.mode == MinesweeperMode.miner) return;
                 final index = _cellAt(details.localPosition, cellSize);
                 setState(() {
                   widget.game.reveal(index);
@@ -278,7 +326,6 @@ class _GameViewState extends State<_GameView> {
                 _doubleTapIndex = _cellAt(details.localPosition, cellSize);
               },
               onDoubleTap: () {
-                if (widget.game.mode == MinesweeperMode.miner) return;
                 setState(() => widget.game.toggleFlag(_doubleTapIndex));
               },
               onPanStart: (_) {
@@ -292,31 +339,25 @@ class _GameViewState extends State<_GameView> {
                       viewportSize: viewport, cellSize: cellSize));
                 }
               },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: SizedBox(
-                  width: viewport,
-                  height: viewport,
-                  child: ColoredBox(
-                    color: scheme.surfaceContainerHighest,
-                    child: _Board(game: widget.game, cellSize: cellSize),
-                  ),
-                ),
-              ),
+              child: viewportWidget,
             );
           }),
-          if (widget.game.mode == MinesweeperMode.miner) ...[
+          if (minerMode) ...[
             const SizedBox(height: 12),
             _MinerMovementControls(
-              onMove: (direction) =>
-                  setState(() => widget.game.moveMiner(direction)),
+              key: ObjectKey(widget.game),
+              enabled: widget.game.status == GameStatus.playing,
+              onMove: (direction) {
+                final turned = widget.game.minerFacing != direction;
+                if (widget.game.moveMiner(direction) || turned) setState(() {});
+              },
               onDig: () => setState(() => widget.game.digMinerFacing()),
               onFlag: () => setState(() => widget.game.flagMinerFacing()),
             ),
           ],
           const SizedBox(height: 18),
           Text(
-              widget.game.mode == MinesweeperMode.miner
+              minerMode
                   ? '${_mineText(context, 'minesweeper.facing', '朝向')}：${_mineDirectionText(context, widget.game.minerFacing)} · ${_mineText(context, 'minesweeper.minerGestureHint', '按挖掘／插旗直接作用前方格子 · 只能走已揭開的格子')}'
                   : _mineText(context, 'minesweeper.gestureHint',
                       '拖曳移動視角 · 點擊翻開 · 雙擊插旗'),
@@ -360,11 +401,14 @@ class _GameViewState extends State<_GameView> {
 
 class _MinerMovementControls extends StatelessWidget {
   const _MinerMovementControls({
+    super.key,
+    required this.enabled,
     required this.onMove,
     required this.onDig,
     required this.onFlag,
   });
 
+  final bool enabled;
   final ValueChanged<MinerDirection> onMove;
   final VoidCallback onDig;
   final VoidCallback onFlag;
@@ -376,7 +420,7 @@ class _MinerMovementControls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _MinerJoystick(onMove: onMove),
+        _MinerJoystick(enabled: enabled, onMove: onMove),
         Column(
           children: [
             FilledButton.icon(
@@ -405,8 +449,9 @@ class _MinerMovementControls extends StatelessWidget {
 }
 
 class _MinerJoystick extends StatefulWidget {
-  const _MinerJoystick({required this.onMove});
+  const _MinerJoystick({required this.enabled, required this.onMove});
 
+  final bool enabled;
   final ValueChanged<MinerDirection> onMove;
 
   @override
@@ -417,32 +462,99 @@ class _MinerJoystickState extends State<_MinerJoystick> {
   static const _size = 150.0;
   static const _knobSize = 48.0;
   static const _maxTravel = 43.0;
+  static const _engageDistance = 9.0;
+  static const _releaseDistance = 6.0;
+  static const _axisSwitchRatio = 1.25;
+  static const _slowRepeatMs = 280;
+  static const _fastRepeatMs = 110;
+  late final AppLifecycleListener _lifecycle;
   Offset _knobOffset = Offset.zero;
-  MinerDirection? _lastDirection;
+  int? _pointer;
+  MinerDirection? _direction;
+  Timer? _repeat;
 
-  void _updateKnob(Offset localPosition) {
-    final center = const Offset(_size / 2, _size / 2);
-    final delta = localPosition - center;
-    final distance = delta.distance;
-    final offset = distance <= _maxTravel
-        ? delta
-        : Offset.fromDirection(math.atan2(delta.dy, delta.dx), _maxTravel);
-    if (distance < 10) return;
-    final direction = offset.dx.abs() >= offset.dy.abs()
-        ? (offset.dx >= 0 ? MinerDirection.right : MinerDirection.left)
-        : (offset.dy >= 0 ? MinerDirection.down : MinerDirection.up);
-    setState(() => _knobOffset = offset);
-    if (_lastDirection != direction) {
-      _lastDirection = direction;
-      widget.onMove(direction);
-    }
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onInactive: _release);
   }
 
-  void _resetKnob() {
-    setState(() {
-      _knobOffset = Offset.zero;
-      _lastDirection = null;
-    });
+  @override
+  void didUpdateWidget(covariant _MinerJoystick oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled) _clearInput();
+  }
+
+  @override
+  void dispose() {
+    _repeat?.cancel();
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _pointerDown(PointerDownEvent event) {
+    if (!widget.enabled || _pointer != null) return;
+    _pointer = event.pointer;
+    _updateKnob(event.localPosition);
+  }
+
+  void _pointerMove(PointerMoveEvent event) {
+    if (event.pointer == _pointer) _updateKnob(event.localPosition);
+  }
+
+  void _pointerEnd(PointerEvent event) {
+    if (event.pointer == _pointer) _release();
+  }
+
+  void _updateKnob(Offset localPosition) {
+    final delta = localPosition - const Offset(_size / 2, _size / 2);
+    final distance = delta.distance;
+    final offset =
+        distance > _maxTravel ? delta * (_maxTravel / distance) : delta;
+    final threshold = _direction == null ? _engageDistance : _releaseDistance;
+    final direction = distance < threshold ? null : _directionFor(delta);
+    setState(() => _knobOffset = offset);
+    if (_direction == direction) return;
+    _repeat?.cancel();
+    _direction = direction;
+    _step();
+  }
+
+  MinerDirection _directionFor(Offset delta) {
+    final x = delta.dx.abs();
+    final y = delta.dy.abs();
+    final horizontal = switch (_direction) {
+      MinerDirection.left || MinerDirection.right => y <= x * _axisSwitchRatio,
+      MinerDirection.up || MinerDirection.down => x > y * _axisSwitchRatio,
+      null => x >= y,
+    };
+    if (horizontal) {
+      return delta.dx >= 0 ? MinerDirection.right : MinerDirection.left;
+    }
+    return delta.dy >= 0 ? MinerDirection.down : MinerDirection.up;
+  }
+
+  void _step() {
+    final direction = _direction;
+    if (direction == null || !widget.enabled) return;
+    widget.onMove(direction);
+    final strength = ((_knobOffset.distance - _engageDistance) /
+            (_maxTravel - _engageDistance))
+        .clamp(0.0, 1.0);
+    final delay = _slowRepeatMs - (_slowRepeatMs - _fastRepeatMs) * strength;
+    _repeat = Timer(Duration(milliseconds: delay.round()), _step);
+  }
+
+  void _clearInput() {
+    _repeat?.cancel();
+    _repeat = null;
+    _pointer = null;
+    _direction = null;
+    _knobOffset = Offset.zero;
+  }
+
+  void _release() {
+    if (_pointer != null) setState(_clearInput);
   }
 
   @override
@@ -451,39 +563,53 @@ class _MinerJoystickState extends State<_MinerJoystick> {
     return SizedBox(
       width: _size,
       height: _size,
-      child: GestureDetector(
+      child: Listener(
         key: const ValueKey('miner-joystick-knob'),
-        onPanStart: (details) => _updateKnob(details.localPosition),
-        onPanUpdate: (details) => _updateKnob(details.localPosition),
-        onPanEnd: (_) => _resetKnob(),
-        onPanCancel: _resetKnob,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 136,
-              height: 136,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(_mineText(context, 'minesweeper.direction', '拖曳方向'),
-                  style: TextStyle(color: scheme.onSurfaceVariant)),
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _pointerDown,
+        onPointerMove: _pointerMove,
+        onPointerUp: _pointerEnd,
+        onPointerCancel: _pointerEnd,
+        child: RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          // The surrounding page can scroll, but a drag that begins on the
+          // stick belongs to the stick until that finger is lifted.
+          gestures: {
+            EagerGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
+              EagerGestureRecognizer.new,
+              (_) {},
             ),
-            Transform.translate(
-              offset: _knobOffset,
-              child: Container(
-                width: _knobSize,
-                height: _knobSize,
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 136,
+                height: 136,
                 decoration: BoxDecoration(
-                  color: scheme.primary,
+                  color: scheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.open_with, color: scheme.onPrimary, size: 22),
+                alignment: Alignment.center,
+                child: Text(_mineText(context, 'minesweeper.direction', '拖曳方向'),
+                    style: TextStyle(color: scheme.onSurfaceVariant)),
               ),
-            ),
-          ],
+              Transform.translate(
+                offset: _knobOffset,
+                child: Container(
+                  width: _knobSize,
+                  height: _knobSize,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child:
+                      Icon(Icons.open_with, color: scheme.onPrimary, size: 22),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -569,34 +695,51 @@ String _mineDirectionText(BuildContext context, MinerDirection direction) {
 }
 
 class _Board extends StatelessWidget {
-  const _Board({required this.game, required this.cellSize});
+  const _Board({
+    super.key,
+    required this.game,
+    required this.cellSize,
+    required this.cameraOffset,
+    required this.animateCamera,
+  });
   final MinesweeperGame game;
   final double cellSize;
+  final Offset cameraOffset;
+  final bool animateCamera;
+
   @override
-  Widget build(BuildContext context) => ClipRect(
-      child: OverflowBox(
-          alignment: Alignment.topLeft,
-          minWidth: 0,
-          maxWidth: double.infinity,
-          minHeight: 0,
-          maxHeight: double.infinity,
-          child: Transform.translate(
-              offset: Offset(-game.viewportX, -game.viewportY),
-              child: SizedBox(
-                  width: game.sideLength * cellSize,
-                  height: game.sideLength * cellSize,
-                  child: Stack(children: [
-                    for (var index = 0; index < game.cells.length; index++)
-                      Positioned(
-                          left: (index % game.sideLength) * cellSize,
-                          top: (index ~/ game.sideLength) * cellSize,
-                          width: cellSize,
-                          height: cellSize,
-                          child: _Cell(
-                              game: game,
-                              index: index,
-                              cell: game.cells[index]))
-                  ])))));
+  Widget build(BuildContext context) {
+    final grid = SizedBox.square(
+      dimension: game.sideLength * cellSize,
+      child: Stack(children: [
+        for (var index = 0; index < game.cells.length; index++)
+          Positioned(
+            left: (index % game.sideLength) * cellSize,
+            top: (index ~/ game.sideLength) * cellSize,
+            width: cellSize,
+            height: cellSize,
+            child: _Cell(game: game, index: index, cell: game.cells[index]),
+          ),
+      ]),
+    );
+    return OverflowBox(
+      alignment: Alignment.topLeft,
+      minWidth: 0,
+      maxWidth: double.infinity,
+      minHeight: 0,
+      maxHeight: double.infinity,
+      child: animateCamera
+          ? TweenAnimationBuilder<Offset>(
+              tween: Tween(begin: -cameraOffset, end: -cameraOffset),
+              duration: const Duration(milliseconds: 95),
+              curve: Curves.easeOut,
+              child: grid,
+              builder: (context, offset, child) =>
+                  Transform.translate(offset: offset, child: child),
+            )
+          : Transform.translate(offset: -cameraOffset, child: grid),
+    );
+  }
 }
 
 class _Cell extends StatelessWidget {
@@ -612,30 +755,25 @@ class _Cell extends StatelessWidget {
             color: revealed ? const Color(0xfff2e2ac) : const Color(0xff5d806b),
             border: Border.all(color: const Color(0xffd2bd7a), width: 1)),
         alignment: Alignment.center,
-        child: game.mode == MinesweeperMode.miner && game.minerIndex == index
-            ? Text('${_minerArrow(game.minerFacing)}⛏️',
-                style: const TextStyle(fontSize: 15))
-            : cell.state == CellState.flagged
-                ? const Text('⚑', style: TextStyle(fontSize: 15))
-                : revealed &&
-                        !cell.isMine &&
-                        game.displayedAdjacentMines(index) > 0
-                    ? Text('${game.displayedAdjacentMines(index)}',
-                        style: const TextStyle(
-                            color: Color(0xff3b72a1),
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold))
-                    : revealed && cell.isMine
-                        ? const Text('✹',
-                            style: TextStyle(
-                                color: Color(0xffd46e4c), fontSize: 14))
-                        : null);
+        child: cell.state == CellState.flagged
+            ? const Text('⚑', style: TextStyle(fontSize: 15))
+            : revealed && !cell.isMine && game.displayedAdjacentMines(index) > 0
+                ? Text('${game.displayedAdjacentMines(index)}',
+                    style: const TextStyle(
+                        color: Color(0xff3b72a1),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold))
+                : revealed && cell.isMine
+                    ? const Text('✹',
+                        style:
+                            TextStyle(color: Color(0xffd46e4c), fontSize: 14))
+                    : null);
   }
-
-  String _minerArrow(MinerDirection direction) => switch (direction) {
-        MinerDirection.up => '↑',
-        MinerDirection.down => '↓',
-        MinerDirection.left => '←',
-        MinerDirection.right => '→',
-      };
 }
+
+String _minerArrow(MinerDirection direction) => switch (direction) {
+      MinerDirection.up => '↑',
+      MinerDirection.down => '↓',
+      MinerDirection.left => '←',
+      MinerDirection.right => '→',
+    };
