@@ -119,7 +119,7 @@ void main() {
     expect(game.status, GameStatus.lost);
   });
 
-  test('miner movement only enters orthogonally revealed cells', () {
+  test('miner cardinal movement only enters revealed cells', () {
     final game = MinesweeperGame(
       selectedSize: BoardSize.nine,
       mode: MinesweeperMode.miner,
@@ -133,6 +133,47 @@ void main() {
 
     while (game.moveMiner(MinerDirection.up)) {}
     expect(game.cells[game.minerIndex!].state, CellState.revealed);
+  });
+
+  test('miner can take each of the four diagonal steps', () {
+    final game = MinesweeperGame(
+      selectedSize: BoardSize.nine,
+      mode: MinesweeperMode.miner,
+      seed: 19,
+    )..start();
+    for (final entry in {
+      MinerDirection.upLeft: 30,
+      MinerDirection.upRight: 32,
+      MinerDirection.downLeft: 48,
+      MinerDirection.downRight: 50,
+    }.entries) {
+      game.minerIndex = 40;
+      expect(game.moveMiner(entry.key), isTrue);
+      expect(game.minerIndex, entry.value);
+    }
+    game.minerIndex = 8;
+    expect(game.moveMiner(MinerDirection.downRight), isFalse);
+    expect(game.minerIndex, 8);
+  });
+
+  test('a blocked diagonal keeps its aim and supports flagging and digging',
+      () {
+    final game = MinesweeperGame(
+      selectedSize: BoardSize.nine,
+      mode: MinesweeperMode.miner,
+      seed: 19,
+    )..start();
+    game.cells[31].state = CellState.covered;
+    expect(game.moveMiner(MinerDirection.upRight), isFalse);
+    expect(game.minerIndex, 40);
+    expect(game.minerFacing, MinerDirection.upRight);
+
+    game.cells[32].state = CellState.covered;
+    game.flagMinerFacing();
+    expect(game.cells[32].state, CellState.flagged);
+    game.flagMinerFacing();
+    game.digMinerFacing();
+    expect(game.cells[32].state, CellState.revealed);
   });
 
   test('miner actions operate on the tile it is facing', () {

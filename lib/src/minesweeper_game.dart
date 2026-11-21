@@ -16,7 +16,25 @@ enum GameStatus { ready, playing, won, lost }
 
 enum MinesweeperMode { classic, miner }
 
-enum MinerDirection { up, down, left, right }
+enum MinerDirection {
+  up(-1, 0, '↑', '上'),
+  down(1, 0, '↓', '下'),
+  left(0, -1, '←', '左'),
+  right(0, 1, '→', '右'),
+  upLeft(-1, -1, '↖', '左上'),
+  upRight(-1, 1, '↗', '右上'),
+  downLeft(1, -1, '↙', '左下'),
+  downRight(1, 1, '↘', '右下');
+
+  const MinerDirection(this.rowDelta, this.columnDelta, this.arrow, this.label);
+
+  final int rowDelta;
+  final int columnDelta;
+  final String arrow;
+  final String label;
+
+  bool get isDiagonal => rowDelta != 0 && columnDelta != 0;
+}
 
 class MinesweeperCell {
   MinesweeperCell(
@@ -52,12 +70,7 @@ class MinesweeperGame {
   int? minerIndex;
   MinerDirection minerFacing = MinerDirection.up;
 
-  String get minerFacingLabel => switch (minerFacing) {
-        MinerDirection.up => '上',
-        MinerDirection.down => '下',
-        MinerDirection.left => '左',
-        MinerDirection.right => '右',
-      };
+  String get minerFacingLabel => minerFacing.label;
 
   int get sideLength => selectedSize.cellsPerSide;
   int get flaggedCount =>
@@ -126,62 +139,48 @@ class MinesweeperGame {
   }
 
   bool moveMiner(MinerDirection direction) {
-    if (mode != MinesweeperMode.miner ||
-        status != GameStatus.playing ||
-        minerIndex == null) return false;
+    final position = _activeMinerIndex;
+    if (position == null) return false;
     minerFacing = direction;
-    final row = minerIndex! ~/ sideLength;
-    final column = minerIndex! % sideLength;
-    final targetRow = row +
-        switch (direction) {
-          MinerDirection.up => -1,
-          MinerDirection.down => 1,
-          MinerDirection.left || MinerDirection.right => 0,
-        };
-    final targetColumn = column +
-        switch (direction) {
-          MinerDirection.left => -1,
-          MinerDirection.right => 1,
-          MinerDirection.up || MinerDirection.down => 0,
-        };
-    if (targetRow < 0 ||
-        targetRow >= sideLength ||
-        targetColumn < 0 ||
-        targetColumn >= sideLength) return false;
-    final target = targetRow * sideLength + targetColumn;
-    if (cells[target].state != CellState.revealed) return false;
+    final target = _neighborInDirection(position, direction);
+    if (target == null || cells[target].state != CellState.revealed)
+      return false;
+    if (direction.isDiagonal) {
+      // The destination is in bounds, so both tiles forming the corner are too.
+      final vertical = position + direction.rowDelta * sideLength;
+      final horizontal = position + direction.columnDelta;
+      if (cells[vertical].state != CellState.revealed ||
+          cells[horizontal].state != CellState.revealed) return false;
+    }
     minerIndex = target;
     return true;
   }
 
   void digMinerFacing() {
-    final target = _minerTargetIndex();
+    final target = _facingTile;
     if (target != null) reveal(target);
   }
 
   void flagMinerFacing() {
-    final target = _minerTargetIndex();
+    final target = _facingTile;
     if (target != null) toggleFlag(target);
   }
 
-  int? _minerTargetIndex() {
-    if (mode != MinesweeperMode.miner ||
-        status != GameStatus.playing ||
-        minerIndex == null) return null;
-    final row = minerIndex! ~/ sideLength;
-    final column = minerIndex! % sideLength;
-    final targetRow = row +
-        switch (minerFacing) {
-          MinerDirection.up => -1,
-          MinerDirection.down => 1,
-          MinerDirection.left || MinerDirection.right => 0,
-        };
-    final targetColumn = column +
-        switch (minerFacing) {
-          MinerDirection.left => -1,
-          MinerDirection.right => 1,
-          MinerDirection.up || MinerDirection.down => 0,
-        };
+  int? get _activeMinerIndex =>
+      mode == MinesweeperMode.miner && status == GameStatus.playing
+          ? minerIndex
+          : null;
+
+  int? get _facingTile {
+    final position = _activeMinerIndex;
+    return position == null
+        ? null
+        : _neighborInDirection(position, minerFacing);
+  }
+
+  int? _neighborInDirection(int position, MinerDirection direction) {
+    final targetRow = position ~/ sideLength + direction.rowDelta;
+    final targetColumn = position % sideLength + direction.columnDelta;
     if (targetRow < 0 ||
         targetRow >= sideLength ||
         targetColumn < 0 ||

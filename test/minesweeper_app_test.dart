@@ -121,7 +121,7 @@ void main() {
   });
 
   testWidgets(
-      'stick repeats while held, stabilizes diagonals and stops in neutral',
+      'stick repeats while held, stabilizes the direction and stops in neutral',
       (tester) async {
     await _startMinerOnPhone(tester);
     final board = find.byKey(const ValueKey('minesweeper-board'));
@@ -144,7 +144,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 95));
     expect(_gridX(tester, board), closeTo(initialGridX, 0.01));
-    await right.moveTo(stick + const Offset(31, 33));
+    await right.moveTo(stick + const Offset(38, 17));
     await tester.pump(const Duration(milliseconds: 20));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.widget<Text>(miner).data, '→⛏️');
@@ -165,6 +165,30 @@ void main() {
     expect(_gridX(tester, board), closeTo(initialGridX, 0.01));
     expect(tester.getCenter(find.byIcon(Icons.open_with)), stick);
   });
+
+  testWidgets(
+      'a diagonal push scrolls both axes while the miner stays centered',
+      (tester) async {
+    await _startMinerOnPhone(tester);
+    final board = find.byKey(const ValueKey('minesweeper-board'));
+    final miner = find.byKey(const ValueKey('miner-player'));
+    final stick = tester.getCenter(
+      find.byKey(const ValueKey('miner-joystick-knob')),
+    );
+    final initialOffset = _gridOffset(tester, board);
+    final cellSize = tester.getSize(board).width / 9;
+
+    final gesture = await tester.startGesture(stick);
+    await gesture.moveBy(const Offset(30, -30));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final movedBy = _gridOffset(tester, board) - initialOffset;
+    expect(movedBy.dx, closeTo(-cellSize, 0.01));
+    expect(movedBy.dy, closeTo(cellSize, 0.01));
+    expect(tester.widget<Text>(miner).data, '↗⛏️');
+    expect(tester.getCenter(miner), tester.getCenter(board));
+  });
 }
 
 Future<void> _startMinerOnPhone(WidgetTester tester) async {
@@ -180,10 +204,15 @@ Future<void> _startMinerOnPhone(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-double _gridX(WidgetTester tester, Finder board) => tester
-    .widget<Transform>(
-      find.descendant(of: board, matching: find.byType(Transform)).first,
-    )
-    .transform
-    .getTranslation()
-    .x;
+double _gridX(WidgetTester tester, Finder board) =>
+    _gridOffset(tester, board).dx;
+
+Offset _gridOffset(WidgetTester tester, Finder board) {
+  final translation = tester
+      .widget<Transform>(
+        find.descendant(of: board, matching: find.byType(Transform)).first,
+      )
+      .transform
+      .getTranslation();
+  return Offset(translation.x, translation.y);
+}

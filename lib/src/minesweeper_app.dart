@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -300,7 +301,7 @@ class _GameViewState extends State<_GameView> {
                       if (minerIndex != null)
                         Center(
                           child: Text(
-                            '${_minerArrow(widget.game.minerFacing)}⛏️',
+                            '${widget.game.minerFacing.arrow}⛏️',
                             key: const ValueKey('miner-player'),
                             style: const TextStyle(fontSize: 15),
                           ),
@@ -464,7 +465,18 @@ class _MinerJoystickState extends State<_MinerJoystick> {
   static const _maxTravel = 43.0;
   static const _engageDistance = 9.0;
   static const _releaseDistance = 6.0;
-  static const _axisSwitchRatio = 1.25;
+  static const _sectorWidth = math.pi / 4;
+  static const _turnMargin = math.pi / 36;
+  static const _clockwiseDirections = [
+    MinerDirection.right,
+    MinerDirection.downRight,
+    MinerDirection.down,
+    MinerDirection.downLeft,
+    MinerDirection.left,
+    MinerDirection.upLeft,
+    MinerDirection.up,
+    MinerDirection.upRight,
+  ];
   static const _slowRepeatMs = 280;
   static const _fastRepeatMs = 110;
   late final AppLifecycleListener _lifecycle;
@@ -521,17 +533,16 @@ class _MinerJoystickState extends State<_MinerJoystick> {
   }
 
   MinerDirection _directionFor(Offset delta) {
-    final x = delta.dx.abs();
-    final y = delta.dy.abs();
-    final horizontal = switch (_direction) {
-      MinerDirection.left || MinerDirection.right => y <= x * _axisSwitchRatio,
-      MinerDirection.up || MinerDirection.down => x > y * _axisSwitchRatio,
-      null => x >= y,
-    };
-    if (horizontal) {
-      return delta.dx >= 0 ? MinerDirection.right : MinerDirection.left;
+    final angle = math.atan2(delta.dy, delta.dx);
+    final current = _direction;
+    if (current != null) {
+      final center = _clockwiseDirections.indexOf(current) * _sectorWidth;
+      final difference =
+          (angle - center + 3 * math.pi) % (2 * math.pi) - math.pi;
+      if (difference.abs() <= _sectorWidth / 2 + _turnMargin) return current;
     }
-    return delta.dy >= 0 ? MinerDirection.down : MinerDirection.up;
+    final sector = (angle / _sectorWidth).round();
+    return _clockwiseDirections[sector % _clockwiseDirections.length];
   }
 
   void _step() {
@@ -542,7 +553,9 @@ class _MinerJoystickState extends State<_MinerJoystick> {
             (_maxTravel - _engageDistance))
         .clamp(0.0, 1.0);
     final delay = _slowRepeatMs - (_slowRepeatMs - _fastRepeatMs) * strength;
-    _repeat = Timer(Duration(milliseconds: delay.round()), _step);
+    // A diagonal tile is farther away, so keep the same travel speed.
+    final stepDelay = direction.isDiagonal ? delay * math.sqrt2 : delay;
+    _repeat = Timer(Duration(milliseconds: stepDelay.round()), _step);
   }
 
   void _clearInput() {
@@ -684,15 +697,9 @@ String _mineText(BuildContext context, String key, String fallback) =>
       GameUiSettingsScope.maybeOf(context)?.locale ?? 'zh-Hant',
     ).text(key, fallback);
 
-String _mineDirectionText(BuildContext context, MinerDirection direction) {
-  final key = switch (direction) {
-    MinerDirection.up => 'minesweeper.direction.up',
-    MinerDirection.down => 'minesweeper.direction.down',
-    MinerDirection.left => 'minesweeper.direction.left',
-    MinerDirection.right => 'minesweeper.direction.right',
-  };
-  return _mineText(context, key, direction.name);
-}
+String _mineDirectionText(BuildContext context, MinerDirection direction) =>
+    _mineText(
+        context, 'minesweeper.direction.${direction.name}', direction.label);
 
 class _Board extends StatelessWidget {
   const _Board({
@@ -770,10 +777,3 @@ class _Cell extends StatelessWidget {
                     : null);
   }
 }
-
-String _minerArrow(MinerDirection direction) => switch (direction) {
-      MinerDirection.up => '↑',
-      MinerDirection.down => '↓',
-      MinerDirection.left => '←',
-      MinerDirection.right => '→',
-    };
