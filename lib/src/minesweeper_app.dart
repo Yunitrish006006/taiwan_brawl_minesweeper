@@ -8,6 +8,14 @@ import 'package:user_ui_settings/user_ui_settings.dart';
 import 'minesweeper_game.dart';
 import 'minesweeper_localizations.dart';
 
+// Flutter 3.50 release builds can jump to an unresolved deferred closure
+// from State.setState. Schedule the same rebuild after synchronous mutations.
+mixin _DeferredGameState<T extends StatefulWidget> on State<T> {
+  void rebuildAfterMutation() {
+    if (mounted) (context as Element).markNeedsBuild();
+  }
+}
+
 class MinesweeperApp extends StatelessWidget {
   const MinesweeperApp({super.key, this.settings});
 
@@ -33,10 +41,26 @@ class MinesweeperHome extends StatefulWidget {
   State<MinesweeperHome> createState() => _MinesweeperHomeState();
 }
 
-class _MinesweeperHomeState extends State<MinesweeperHome> {
+class _MinesweeperHomeState extends State<MinesweeperHome>
+    with _DeferredGameState<MinesweeperHome> {
   BoardSize _selected = BoardSize.nine;
   MinesweeperMode _mode = MinesweeperMode.classic;
   MinesweeperGame? _game;
+
+  void _selectSize(BoardSize value) {
+    _selected = value;
+    rebuildAfterMutation();
+  }
+
+  void _selectMode(MinesweeperMode value) {
+    _mode = value;
+    rebuildAfterMutation();
+  }
+
+  void _startGame() {
+    _game = MinesweeperGame(selectedSize: _selected, mode: _mode)..start();
+    rebuildAfterMutation();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,21 +72,11 @@ class _MinesweeperHomeState extends State<MinesweeperHome> {
         child: game == null
             ? _StartView(
                 selected: _selected,
-                onSelected: (value) => setState(() => _selected = value),
+                onSelected: _selectSize,
                 mode: _mode,
-                onModeSelected: (value) => setState(() => _mode = value),
-                onStart: () => setState(() {
-                      _game =
-                          MinesweeperGame(selectedSize: _selected, mode: _mode)
-                            ..start();
-                    }))
-            : _GameView(
-                game: game,
-                onRestart: () => setState(() {
-                      _game =
-                          MinesweeperGame(selectedSize: _selected, mode: _mode)
-                            ..start();
-                    })),
+                onModeSelected: _selectMode,
+                onStart: _startGame)
+            : _GameView(game: game, onRestart: _startGame),
       ),
     );
     return settings == null
@@ -208,7 +222,8 @@ class _GameView extends StatefulWidget {
   State<_GameView> createState() => _GameViewState();
 }
 
-class _GameViewState extends State<_GameView> {
+class _GameViewState extends State<_GameView>
+    with _DeferredGameState<_GameView> {
   static const dragSlop = 12.0;
   Timer? _timer;
   bool _moved = false;
@@ -218,8 +233,10 @@ class _GameViewState extends State<_GameView> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && widget.game.status == GameStatus.playing)
-        setState(() => widget.game.elapsedSeconds++);
+      if (mounted && widget.game.status == GameStatus.playing) {
+        widget.game.elapsedSeconds++;
+        rebuildAfterMutation();
+      }
     });
   }
 
@@ -255,8 +272,10 @@ class _GameViewState extends State<_GameView> {
           if (!minerMode)
             _FlagSubtractionSwitch(
                 game: widget.game,
-                onChanged: (value) =>
-                    setState(() => widget.game.autoSubtractFlagged = value)),
+                onChanged: (value) {
+                  widget.game.autoSubtractFlagged = value;
+                  rebuildAfterMutation();
+                }),
           if (minerMode) ...[
             const SizedBox(height: 12),
           ],
@@ -319,15 +338,15 @@ class _GameViewState extends State<_GameView> {
               key: boardKey,
               onTapUp: (details) {
                 final index = _cellAt(details.localPosition, cellSize);
-                setState(() {
-                  widget.game.reveal(index);
-                });
+                widget.game.reveal(index);
+                rebuildAfterMutation();
               },
               onDoubleTapDown: (details) {
                 _doubleTapIndex = _cellAt(details.localPosition, cellSize);
               },
               onDoubleTap: () {
-                setState(() => widget.game.toggleFlag(_doubleTapIndex));
+                widget.game.toggleFlag(_doubleTapIndex);
+                rebuildAfterMutation();
               },
               onPanStart: (_) {
                 _moved = false;
@@ -335,9 +354,9 @@ class _GameViewState extends State<_GameView> {
               onPanUpdate: (details) {
                 if (details.delta.distance > dragSlop) _moved = true;
                 if (_moved) {
-                  setState(() => widget.game.panBy(
-                      details.delta.dx, details.delta.dy,
-                      viewportSize: viewport, cellSize: cellSize));
+                  widget.game.panBy(details.delta.dx, details.delta.dy,
+                      viewportSize: viewport, cellSize: cellSize);
+                  rebuildAfterMutation();
                 }
               },
               child: viewportWidget,
@@ -350,10 +369,17 @@ class _GameViewState extends State<_GameView> {
               enabled: widget.game.status == GameStatus.playing,
               onMove: (direction) {
                 final turned = widget.game.minerFacing != direction;
-                if (widget.game.moveMiner(direction) || turned) setState(() {});
+                if (widget.game.moveMiner(direction) || turned)
+                  rebuildAfterMutation();
               },
-              onDig: () => setState(() => widget.game.digMinerFacing()),
-              onFlag: () => setState(() => widget.game.flagMinerFacing()),
+              onDig: () {
+                widget.game.digMinerFacing();
+                rebuildAfterMutation();
+              },
+              onFlag: () {
+                widget.game.flagMinerFacing();
+                rebuildAfterMutation();
+              },
             ),
           ],
           const SizedBox(height: 18),
@@ -459,7 +485,8 @@ class _MinerJoystick extends StatefulWidget {
   State<_MinerJoystick> createState() => _MinerJoystickState();
 }
 
-class _MinerJoystickState extends State<_MinerJoystick> {
+class _MinerJoystickState extends State<_MinerJoystick>
+    with _DeferredGameState<_MinerJoystick> {
   static const _size = 150.0;
   static const _knobSize = 48.0;
   static const _maxTravel = 43.0;
@@ -525,7 +552,8 @@ class _MinerJoystickState extends State<_MinerJoystick> {
         distance > _maxTravel ? delta * (_maxTravel / distance) : delta;
     final threshold = _direction == null ? _engageDistance : _releaseDistance;
     final direction = distance < threshold ? null : _directionFor(delta);
-    setState(() => _knobOffset = offset);
+    _knobOffset = offset;
+    rebuildAfterMutation();
     if (_direction == direction) return;
     _repeat?.cancel();
     _direction = direction;
@@ -567,7 +595,10 @@ class _MinerJoystickState extends State<_MinerJoystick> {
   }
 
   void _release() {
-    if (_pointer != null) setState(_clearInput);
+    if (_pointer != null) {
+      _clearInput();
+      rebuildAfterMutation();
+    }
   }
 
   @override
